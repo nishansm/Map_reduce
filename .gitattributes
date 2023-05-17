@@ -1,2 +1,73 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+import threading
+
+def map_func(data):
+    words = data.split()
+    word_count = {}
+    
+    for word in words:
+        if word in word_count:
+            word_count[word] += 1
+        else:
+            word_count[word] = 1
+  
+    result = []
+    for word, count in word_count.items():
+        result.append((word, count))
+    
+    return result
+
+def reduce_func(word_counts):
+    word_count = {}
+   
+    for word, count in word_counts:
+        if word in word_count:
+            word_count[word] += count
+        else:
+            word_count[word] = count
+    
+    return word_count
+
+def map_reduce(data):
+  
+    chunk_size = len(data) // 4
+    chunks = [data[i:i+chunk_size] for i in range(0, len(data), chunk_size)]
+    
+    map_threads = []
+    for chunk in chunks:
+        thread = threading.Thread(target=map_func, args=(chunk,))
+        map_threads.append(thread)
+        thread.start()
+        
+    for thread in map_threads:
+        thread.join()
+    
+    map_results = []
+    for thread in map_threads:
+        map_results.extend(thread.result())
+    map_results.sort(key=lambda x: x[0])
+    
+    reduce_threads = []
+    chunk_size = len(map_results) // 4
+    chunks = [map_results[i:i+chunk_size] for i in range(0, len(map_results), chunk_size)]
+    for chunk in chunks:
+        thread = threading.Thread(target=reduce_func, args=(chunk,))
+        reduce_threads.append(thread)
+        thread.start()
+    
+    for thread in reduce_threads:
+        thread.join()
+  
+    final_result = {}
+    for thread in reduce_threads:
+        word_count = thread.result()
+        final_result.update(word_count)
+    
+    return final_result
+    
+with open('input.txt', 'r') as file:
+    document = file.read()
+
+result = map_reduce(document)
+
+for word, count in result.items():
+    print(f'{word}: {count}')
